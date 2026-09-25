@@ -257,12 +257,15 @@ function mapLink(loc){
 async function loadSettings(){
   try{
     const doc = await db.collection('settings').doc('app').get();
-    if(doc.exists) settings = {
-      appName: doc.data().appName || DEFAULT_APP_NAME,
-      logoUrl: doc.data().logoUrl || DEFAULT_LOGO,
-      heroUrl: doc.data().heroUrl || DEFAULT_TRUCK_HERO,
-      inviteCode: doc.data().inviteCode || ""
-    };
+    if(doc.exists){
+      const d = doc.data();
+      settings = {
+        appName: d.appName !== undefined ? d.appName : DEFAULT_APP_NAME,
+        logoUrl: d.logoUrl !== undefined ? d.logoUrl : DEFAULT_LOGO,
+        heroUrl: d.heroUrl !== undefined ? d.heroUrl : DEFAULT_TRUCK_HERO,
+        inviteCode: d.inviteCode || ""
+      };
+    }
     const favicon = document.querySelector('link[rel="icon"]') || document.createElement('link');
     favicon.rel = 'icon'; favicon.href = settings.logoUrl;
     document.head.appendChild(favicon);
