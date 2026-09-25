@@ -549,12 +549,14 @@ function renderAgentTab(){
   } else {
     content.innerHTML = `<div id="orders-list"><div class="empty-state">Loading…</div></div>`;
     if(unsubOrders) unsubOrders();
-    unsubOrders = db.collection('orders').where('agentId','==',profile.id).orderBy('createdAt','desc')
+    unsubOrders = db.collection('orders').where('agentId','==',profile.id)
       .onSnapshot(snap => {
         const list = document.getElementById('orders-list');
         if(!list) return;
         if(snap.empty){ list.innerHTML = `<div class="empty-state"><div class="display">No orders yet</div>Submit your first order to get started.</div>`; return; }
-        list.innerHTML = snap.docs.map(d => renderOrderCard({id:d.id, ...d.data()}, 'agent')).join('');
+        let docs = snap.docs.map(d => ({id:d.id, ...d.data()}));
+        docs.sort((a,b) => (b.createdAt?.toMillis?.()||0) - (a.createdAt?.toMillis?.()||0));
+        list.innerHTML = docs.map(o => renderOrderCard(o, 'agent')).join('');
       });
   }
 }
@@ -623,13 +625,14 @@ function renderDriverTab(){
       renderDriverTab();
     };
     if(unsubOrders) unsubOrders();
-    unsubOrders = db.collection('expenses').where('driverId','==',profile.id).orderBy('submittedAt','desc')
+    unsubOrders = db.collection('expenses').where('driverId','==',profile.id)
       .onSnapshot(snap => {
         const list = document.getElementById('expenses-list');
         if(!list) return;
         if(snap.empty){ list.innerHTML = `<div class="empty-state">No expenses submitted yet.</div>`; return; }
-        list.innerHTML = `<div class="card">` + snap.docs.map(d => {
-          const e = d.data();
+        let docs = snap.docs.map(d => ({id:d.id, ...d.data()}));
+        docs.sort((a,b) => (b.submittedAt?.toMillis?.()||0) - (a.submittedAt?.toMillis?.()||0));
+        list.innerHTML = `<div class="card">` + docs.map(e => {
           return `<div class="exp-row">
             <div class="exp-info"><span class="exp-cat">${esc(e.category)}</span><br>${esc(e.note||'')}<br><span style="color:var(--muted);font-size:11.5px;">${fmtTime(e.submittedAt)}</span></div>
             <div style="text-align:right;">
@@ -646,19 +649,21 @@ function renderDriverTab(){
   if(unsubOrders) unsubOrders();
 
   let query;
+  let statusFilter = null;
   if(activeTab === 'pool') query = db.collection('orders').where('status','==','pool');
-  else if(activeTab === 'active') query = db.collection('orders').where('driverId','==',profile.id).where('status','in',['accepted','picked_up']);
-  else query = db.collection('orders').where('driverId','==',profile.id).where('status','in',['delivered','cancelled']);
+  else if(activeTab === 'active'){ query = db.collection('orders').where('driverId','==',profile.id); statusFilter = ['accepted','picked_up']; }
+  else { query = db.collection('orders').where('driverId','==',profile.id); statusFilter = ['delivered','cancelled']; }
 
   unsubOrders = query.onSnapshot(snap => {
     const list = document.getElementById('orders-list');
     if(!list) return;
-    if(snap.empty){
+    let docs = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    if(statusFilter) docs = docs.filter(o => statusFilter.includes(o.status));
+    if(docs.length === 0){
       const msgs = { pool:'No loads available right now.', active:'No active loads.', history:'No completed loads yet.' };
       list.innerHTML = `<div class="empty-state"><div class="display">All clear</div>${msgs[activeTab]}</div>`;
       return;
     }
-    let docs = snap.docs.map(d => ({id:d.id, ...d.data()}));
     docs.sort((a,b) => (b.createdAt?.toMillis?.()||0) - (a.createdAt?.toMillis?.()||0));
     list.innerHTML = docs.map(o => renderOrderCard(o, 'driver')).join('');
     attachDriverHandlers();
@@ -863,11 +868,13 @@ function renderAdminTab(){
     });
   } else if(activeTab === 'approvals'){
     content.innerHTML = `<div id="orders-list"><div class="empty-state">Loading…</div></div>`;
-    unsubOrders = db.collection('orders').where('status','==','pending_admin').orderBy('createdAt','desc').onSnapshot(snap => {
+    unsubOrders = db.collection('orders').where('status','==','pending_admin').onSnapshot(snap => {
       const list = document.getElementById('orders-list');
       if(!list) return;
       if(snap.empty){ list.innerHTML = `<div class="empty-state"><div class="display">Nothing pending</div>All caught up.</div>`; return; }
-      list.innerHTML = snap.docs.map(d => renderOrderCard({id:d.id, ...d.data()}, 'admin')).join('');
+      let docs = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      docs.sort((a,b) => (b.createdAt?.toMillis?.()||0) - (a.createdAt?.toMillis?.()||0));
+      list.innerHTML = docs.map(o => renderOrderCard(o, 'admin')).join('');
       attachAdminOrderHandlers();
     });
   } else if(activeTab === 'financials'){
